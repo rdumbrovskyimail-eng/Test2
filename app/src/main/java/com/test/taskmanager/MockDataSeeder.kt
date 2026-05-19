@@ -1,8 +1,28 @@
 package com.test.taskmanager
 
+import java.time.LocalDateTime
+
+enum class TaskPriority { LOW, MEDIUM, HIGH, URGENT }
+
+data class Task(
+    val id: String,
+    val title: String,
+    val isDone: Boolean,
+    val description: String,
+    val priority: TaskPriority = TaskPriority.MEDIUM,
+    val tags: Set<String> = emptySet(),
+    val dueDate: LocalDateTime? = null,
+    val createdAt: LocalDateTime = LocalDateTime.now()
+)
+
+data class TaskStats(val total: Int, val completed: Int, val pending: Int)
+data class TaskFilter(val priority: TaskPriority? = null, val tags: Set<String> = emptySet())
+data class TaskBatch(val tasks: List<Task>, val batchId: String)
+data class TaskChangelog(val taskId: String, val change: String, val timestamp: LocalDateTime = LocalDateTime.now())
+
 object MockDataSeeder {
     val preloadTasks = listOf(
-        Task("1", "Купить молоко", false, "Сходить в магазин вечером"),
+        Task("1", "Купить молоко", false, "Сходить в магазин вечером", TaskPriority.MEDIUM, setOf("shopping")),
         Task("2", "Позвонить маме", true, "Узнать как дела"),
         Task("3", "Написать код", false, "Доделать Pipeline в OpusIDE"),
         Task("4", "Покормить кота", false, "Купить влажный корм"),
@@ -65,4 +85,53 @@ object MockDataSeeder {
     fun getPendingTasks(): List<Task> {
         return preloadTasks.filter { !it.isDone }
     }
+
+    fun getTasksByPriority(priority: TaskPriority) = preloadTasks.filter { it.priority == priority }
+    fun getTasksByTag(tag: String) = preloadTasks.filter { it.tags.contains(tag) }
+    fun getOverdueTasks() = preloadTasks.filter { it.dueDate?.isBefore(LocalDateTime.now()) == true }
+    fun getTasksDueWithin(hours: Long) = preloadTasks.filter { it.dueDate?.isBefore(LocalDateTime.now().plusHours(hours)) == true }
+    fun getTasksSortedByPriority() = preloadTasks.sortedBy { it.priority }
+    fun getTasksSortedByDueDate() = preloadTasks.sortedBy { it.dueDate }
+    fun getTasksSortedByCreatedAt() = preloadTasks.sortedBy { it.createdAt }
+    fun searchTasks(query: String) = preloadTasks.filter { it.title.contains(query, true) || it.description.contains(query, true) }
+    fun getTaskStats() = TaskStats(preloadTasks.size, preloadTasks.count { it.isDone }, preloadTasks.count { !it.isDone })
+    fun getTasksGroupedByPriority() = preloadTasks.groupBy { it.priority }
+    fun getTasksGroupedByStatus() = preloadTasks.groupBy { it.isDone }
+    fun getTasksGroupedByTag() = preloadTasks.flatMap { task -> task.tags.map { it to task } }.groupBy({ it.first }, { it.second })
+    fun getRecentlyUpdatedTasks(limit: Int = 5) = preloadTasks.sortedByDescending { it.createdAt }.take(limit)
+    fun getRandomTask() = preloadTasks.randomOrNull()
+    fun getRandomPendingTask() = getPendingTasks().randomOrNull()
+    fun generateTaskId() = java.util.UUID.randomUUID().toString()
+    fun createTask(title: String, description: String) = Task(generateTaskId(), title, false, description)
+    fun duplicateTask(task: Task) = task.copy(id = generateTaskId())
+    fun markTaskDone(task: Task) = task.copy(isDone = true)
+    fun markTaskPending(task: Task) = task.copy(isDone = false)
+    fun updateTaskPriority(task: Task, priority: TaskPriority) = task.copy(priority = priority)
+    fun addTagToTask(task: Task, tag: String) = task.copy(tags = task.tags + tag)
+    fun removeTagFromTask(task: Task, tag: String) = task.copy(tags = task.tags - tag)
+    fun applyFilter(tasks: List<Task>, filter: TaskFilter) = tasks.filter { (filter.priority == null || it.priority == filter.priority) && (filter.tags.isEmpty() || it.tags.containsAll(filter.tags)) }
+    fun splitIntoBatches(tasks: List<Task>, size: Int) = tasks.chunked(size).mapIndexed { i, list -> TaskBatch(list, "batch-$i") }
+    fun getPaginatedTasks(page: Int, size: Int) = preloadTasks.drop(page * size).take(size)
+    fun getTaskCompletionTimeline() = preloadTasks.filter { it.isDone }.sortedBy { it.createdAt }
+    fun exportToJson(tasks: List<Task>): String = "[]"
+    fun importFromJson(json: String): List<Task> = emptyList()
+    fun getAssigneeSummary() = mapOf<String, Int>()
+    fun validateTask(task: Task) = task.title.isNotBlank()
+    fun getTopTags(limit: Int = 5) = preloadTasks.flatMap { it.tags }.groupingBy { it }.eachCount().toList().sortedByDescending { it.second }.take(limit)
+    fun mergeTaskLists(list1: List<Task>, list2: List<Task>) = (list1 + list2).distinctBy { it.id }
+    fun generateStressTestTasks(count: Int) = List(count) { createTask("Stress $it", "Desc $it") }
+    fun computeTaskHash(task: Task) = task.hashCode()
+    fun diffTasks(t1: Task, t2: Task) = t1 != t2
+    fun getTasksWithAllTags(tags: Set<String>) = preloadTasks.filter { it.tags.containsAll(tags) }
+    fun getTasksWithAnyTag(tags: Set<String>) = preloadTasks.filter { it.tags.any { tag -> tags.contains(tag) } }
+}
+
+object TaskIndex {
+    private val index = mutableMapOf<String, Task>()
+    fun add(task: Task) { index[task.id] = task }
+    fun get(id: String) = index[id]
+}
+
+object MockDataSeederV2 {
+    fun seed() = MockDataSeeder.preloadTasks
 }
