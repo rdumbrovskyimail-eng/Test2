@@ -1,4 +1,6 @@
 package com.test.taskmanager
 class TaskViewModel { 
-    // TODO: implement 
+    fun loadTasks() {
+        println("Loading tasks...")
+    }
 }
